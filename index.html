@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -483,19 +483,28 @@ function extractDbFromSource(txt){
   try{ const d = JSON.parse(raw); return Array.isArray(d.skills) ? d : null; }catch(e){ return null; }
 }
 
-/* 读取仓库文件原文 */
-async function fetchRemoteText(){
-  if(!gitReady()) return null;
-  const parts = gitParts(); if(!parts) return null;
+/* 读取仓库文件（返回状态码，便于提示具体原因） */
+function authHeaders(extra){
+  const h = Object.assign({}, extra || {});
+  if(state.git.token) h.Authorization = 'Bearer ' + state.git.token;
+  return h;
+}
+async function fetchRemoteFile(){
+  if(!gitReady()) return {ok:false, status:0, text:''};
+  const parts = gitParts(); if(!parts) return {ok:false, status:0, text:''};
   const path = encPath(state.git.path), branch = encBranch(state.git.branch);
   try{
     const res = state.git.token
       ? await fetch(`https://api.github.com/repos/${parts.owner}/${parts.repo}/contents/${path}?ref=${branch}`,
-          {headers:{Authorization:'Bearer ' + state.git.token, Accept:'application/vnd.github.raw'}})
+          {headers: authHeaders({Accept:'application/vnd.github.raw'})})
       : await fetch(`https://raw.githubusercontent.com/${parts.owner}/${parts.repo}/${branch}/${path}?t=${Date.now()}`);
-    if(!res.ok) return null;
-    return await res.text();
-  }catch(e){ return null; }
+    const text = res.ok ? await res.text() : '';
+    return {ok: res.ok, status: res.status, text};
+  }catch(e){ return {ok:false, status:-1, text:''}; }
+}
+async function fetchRemoteText(){
+  const f = await fetchRemoteFile();
+  return f.ok ? f.text : null;
 }
 
 /* 读取仓库里的技能库 */
@@ -606,33 +615,62 @@ function openGitDialog(){
   const gp = document.getElementById('gp');
   document.getElementById('gHead').onclick = ()=> gp.classList.toggle('fold');
   document.getElementById('gTest').onclick = async ()=>{
-    const txt = await fetchRemoteText();
-    if(!txt){ toast('连接失败：检查仓库、分支、路径或 Token'); return; }
-    if(isHtmlPath()){
-      const db = extractDbFromSource(txt);
-      toast(db ? `连接成功：读到最后 ${db.skills.length} 条技能` : '连接成功，但文件里没找到技能库结构');
-    } else {
-      toast('连接成功：仓库可读');
+    readGitForm();
+    const parts = gitParts();
+    if(!parts){ toast('仓库格式应为 用户名/仓库名'); return; }
+    toast('正在连接…');
+    const f = await fetchRemoteFile();
+    if(f.ok){
+      if(isHtmlPath()){
+        const db = extractDbFromSource(f.text);
+        toast(db ? `连接成功：读到 ${db.skills.length} 条技能` : '连接成功，但文件里没找到技能库结构');
+      } else {
+        toast('连接成功：数据文件可读');
+      }
+      return;
     }
+    if(f.status === -1){ toast('连接失败：网络不可达'); return; }
+    if(f.status === 401 || f.status === 403){
+      toast(`连接失败（HTTP ${f.status}）：Token 无效或无权限`); return;
+    }
+    try{
+      const res = await fetch(`https://api.github.com/repos/${parts.owner}/${parts.repo}`, {headers: authHeaders()});
+      if(res.ok){
+        toast(`连接正常：仓库可访问，但 ${state.git.branch} 分支下还没有 ${state.git.path}（首次同步会自动创建）`);
+      } else if(res.status === 404){
+        toast('连接失败：仓库不存在，或私有仓库没填 Token');
+      } else if(res.status === 401 || res.status === 403){
+        toast(`连接失败（HTTP ${res.status}）：Token 无效或无权限`);
+      } else {
+        toast('连接失败（HTTP ' + res.status + '）');
+      }
+    }catch(e){ toast('连接失败：网络不可达'); }
   };
   document.getElementById('gSave').onclick = saveGitSettings;
   document.getElementById('gSync').onclick = async ()=>{
+    readGitForm();
+    if(!gitReady()){ toast('先填写 用户名/仓库名'); return; }
     toast('正在提交…');
     const r = await pushRemoteDb('手动同步 ' + new Date().toLocaleString('zh-CN'));
     toast(r === 'ok' ? '已提交到仓库' : r === 'noauth' ? '需要先填写 Token 才能提交' : '提交失败：检查仓库/权限');
   };
 }
-function saveGitSettings(){
-  const was = gitReady();
+function readGitForm(){
   state.git.repoFull = document.getElementById('g_repo').value.trim();
   state.git.branch = document.getElementById('g_branch').value.trim() || 'main';
   state.git.path = document.getElementById('g_path').value.trim() || 'index.html';
   state.git.token = document.getElementById('g_token').value.trim();
+}
+function saveGitSettings(){
+  const was = gitReady();
+  readGitForm();
   saveGit();
   const ready = gitReady();
   const badge = document.getElementById('gBadge');
   if(badge){ badge.textContent = ready ? '已配置' : '未配置'; badge.className = 'gbadge' + (ready ? '' : ' off'); }
-  toast(ready ? '配置已保存' : '配置已保存：仓库格式应为 用户名/仓库名');
+  toast(ready
+    ? (state.git.token ? '配置已保存（可读取、可提交）' : '配置已保存（未填 Token：能读取，提交需 Token）')
+    : '配置已保存：仓库格式应为 用户名/仓库名');
   if(ready && !was) pullRemote(false);
 }
 
@@ -1139,4 +1177,3 @@ if(gitReady()) pullRemote(false);
 </script>
 </body>
 </html>
-<!-- （注：内容由AI生成） -->
