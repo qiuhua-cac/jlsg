@@ -183,6 +183,12 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
     -webkit-user-select: text !important;
     user-select: text !important;
 }
+
+/* 关键：恢复所有按钮的正常点击反馈 */
+.skil, .btn, .tbtn, .pitem, .hubitem {
+    touch-action: manipulation; /* 禁用双击缩放，提升点击响应 */
+    cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -897,53 +903,86 @@ if(raw){
 function closeDialog(){ document.getElementById('modal').classList.remove('show'); }
 
 function attachLongPress(node, cb){
-  let timer = null, isLongPress = false;
+  let timer = null;
+  let isLongPress = false;
+  let startX = 0, startY = 0;
 
-  const start = (e) => {
+  // 触摸开始
+  node.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) return; // 多指触摸不触发
     isLongPress = false;
-    // 注意：有些浏览器如果拦截了 touchstart 的默认行为，会让后续的 click 失效，
-    // 但为了防住系统的长按菜单，我们必须在这里加上 e.preventDefault()，
-    // 然后用 click 和 touchend 来补偿正常的点击事件。
-    if (e.type === 'touchstart' || e.type === 'pointerdown') {
-        if (e.cancelable) e.preventDefault(); 
-    }
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
 
     timer = setTimeout(() => {
       isLongPress = true;
-      // 阻止因系统长按触发的文字选中
+      // 强制清除系统选中
       if (window.getSelection) {
-          if (window.getSelection().empty) window.getSelection().empty();
-          else if (window.getSelection().removeAllRanges) window.getSelection().removeAllRanges();
+        if (window.getSelection().empty) window.getSelection().empty();
+        else if (window.getSelection().removeAllRanges) window.getSelection().removeAllRanges();
       }
-      cb(); // 触发我们的弹窗
-    }, 460);
-  };
+      cb(); // 触发弹窗
+    }, 500); // 500毫秒判定为长按
+  }, { passive: true });
 
-  const cancel = () => {
-    if(timer) { clearTimeout(timer); timer = null; }
-  };
+  // 触摸移动（如果手指滑动超过一定距离，取消长按）
+  node.addEventListener('touchmove', (e) => {
+    if (timer && e.touches.length > 0) {
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      const dy = Math.abs(e.touches[0].clientY - startY);
+      if (dx > 10 || dy > 10) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    }
+  }, { passive: true });
 
-  // 触摸/鼠标按下时拦截
-  node.addEventListener('touchstart', start, { passive: false });
-  node.addEventListener('mousedown', start);
-  
-  node.addEventListener('touchend', cancel);
-  node.addEventListener('mouseup', cancel);
-  node.addEventListener('mouseleave', cancel);
-  node.addEventListener('touchcancel', cancel);
-  node.addEventListener('pointercancel', cancel);
-  
-  // 直接绑定在节点上，强行拦截原生右键/长按
-  node.oncontextmenu = (e) => { 
-      e.preventDefault(); 
+  // 触摸结束
+  node.addEventListener('touchend', (e) => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    // 如果已经触发了长按，阻止后续的 click 事件
+    if (isLongPress) {
+      e.preventDefault();
       e.stopPropagation();
-      cancel(); 
-      cb(); 
-      return false;
-  };
+      isLongPress = false;
+    }
+  });
 
-  // 正常的点击反馈（用于选中技能、添加技能等）
-  node.addEventListener('click', e => {
+  // 触摸取消
+  node.addEventListener('touchcancel', () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+    isLongPress = false;
+  });
+
+  // 桌面端右键长按支持
+  node.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; // 只响应左键
+    isLongPress = false;
+    timer = setTimeout(() => {
+      isLongPress = true;
+      cb();
+    }, 500);
+  });
+
+  node.addEventListener('mouseup', () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+  });
+
+  node.addEventListener('mouseleave', () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+  });
+
+  // 阻止右键菜单
+  node.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (timer) { clearTimeout(timer); timer = null; }
+    cb(); // 直接右键触发
+    return false;
+  });
+
+  // 如果处于长按状态，拦截正常的点击
+  node.addEventListener('click', (e) => {
     if (isLongPress) {
       e.preventDefault();
       e.stopPropagation();
@@ -1321,12 +1360,12 @@ function openSkillForm(target, isZ){
   const body = isZ ? `<div class="form">
       <div class="fl">技能名（两个字）</div><input type="text" id="f_name" value="${isEdit?esc(target.name):''}">
       <div class="fl">技能说明</div><textarea id="f_desc" rows="3">${isEdit?esc(target.desc):''}</textarea>
-      <div class="fl">氪金（0 或 1）</div><input type="text" id="f_kejin" value="${isEdit?esc(target.kejin):'0'}">
+      <div class="fl">氪金（0 或 1）</div><input type="text" id="f_kejin" value="${isEdit?esc(target.kejin):'1'}">
     </div>` : `<div class="form">
       <div class="fl">技能名（两个字）</div><input type="text" id="f_name" value="${isEdit?esc(target.name):''}">
       <div class="fl">色需（红黄绿蓝 四位数字）</div><input type="text" id="f_sexu" value="${isEdit?esc(target.sexu):''}">
       <div class="fl">技能说明</div><textarea id="f_desc" rows="3">${isEdit?esc(target.desc):''}</textarea>
-      <div class="fl">氪金（0 或 1）</div><input type="text" id="f_kejin" value="${isEdit?esc(target.kejin):'0'}">
+      <div class="fl">氪金（0 或 1）</div><input type="text" id="f_kejin" value="${isEdit?esc(target.kejin):'1'}">
     </div>`;
 
   openDialog({
