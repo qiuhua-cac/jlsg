@@ -191,7 +191,7 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
 }
 </style>
 </head>
-<body>
+<body oncontextmenu="return false;" ontouchstart="return true;">
 <div id="app">
   <div class="appbar">
     <div class="title">极略三国合珠子辅助器</div>
@@ -915,14 +915,20 @@ function attachLongPress(node, cb){
     startY = e.touches[0].clientY;
 
     timer = setTimeout(() => {
-      isLongPress = true;
-      // 强制清除系统选中
-      if (window.getSelection) {
-        if (window.getSelection().empty) window.getSelection().empty();
-        else if (window.getSelection().removeAllRanges) window.getSelection().removeAllRanges();
-      }
-      cb(); // 触发弹窗
-    }, 500); // 500毫秒判定为长按
+  isLongPress = true;
+  
+  // 关键：取消手机的震动反馈
+  if (navigator.vibrate) {
+    navigator.vibrate(0); // 传入 0 可以立刻终止震动
+  }
+  
+  // 强制清除系统选中
+  if (window.getSelection) {
+    if (window.getSelection().empty) window.getSelection().empty();
+    else if (window.getSelection().removeAllRanges) window.getSelection().removeAllRanges();
+  }
+  cb(); // 触发弹窗
+}, 500); // 500毫秒判定为长按
   }, { passive: true });
 
   // 触摸移动（如果手指滑动超过一定距离，取消长按）
