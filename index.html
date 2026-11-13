@@ -364,15 +364,7 @@ function pointsGrid(list, model){
 
 /* ================= 状态 ================= */
 const KEY = 'jl_sanguo_hezhuzi_589';
-const PRESET_SETS = [
-  ['龙伤套',['苦肉','诈降','龙魂','回春','怒发','极弓','红颜']],
-  ['奇才温良套',['暗箭','回春','温良','龙吟','奇才','红颜','极弓']],
-  ['残普套',['残掠','普渡','刻死','当先','绝情','焚城']],
-  ['变天套',['变天','闪戏','回春','据守','溃围','称象','鬼才']],
-  ['妖惑游龙套',['妖惑','游龙','游侠','魂引','捧日','布教']],
-  ['震魂杀意套',['震魂','杀意','咆哮','武圣','行殇','享乐','当先']],
-  ['三珠套',['洛神','齐射','鬼门','天妒','神愤','狂暴','乱武']]
-];
+const PRESET_SETS = []; // 彻底清空出厂预置套装，杜绝死灰复燃
 
 const state = {
   library: [], zuoyou: [],
@@ -392,14 +384,11 @@ function loadStore(){
   let saved = null;
   try{ saved = JSON.parse(localStorage.getItem(KEY) || 'null'); }catch(e){ saved = null; }
   if(saved && saved.imageModel !== undefined) state.imageModel = saved.imageModel;
-  /* DB 里已经带着套装（本机或仓库）→ 以 DB 为准，避免被旧的本地缓存顶回来 */
-  if(state.hasDbSets) return;
+  
+  // 完全摒弃出厂预置，一切以本地保存或数据库为准
   if(!saved || !saved.sets || !Object.keys(saved.sets).length){
-    for(const [name,names] of PRESET_SETS){
-      state.sets[name] = {skills: names.slice(), zuoyou: null};
-      state.setOrder.push(name);
-    }
-    state.setOrder.unshift('测试');
+    state.sets = {};
+    state.setOrder = ['测试']; // 没数据？那就只留一个测试
     return;
   }
   Object.keys(saved.sets).forEach(k=>{ state.sets[k] = normalizeSet(saved.sets[k]); });
@@ -733,7 +722,15 @@ async function pullRemote(force){
 /* 色链保存：先落本机，再提交仓库 */
 function commitChange(name){
   state.dbSavedAt = Date.now();
+  // 关键：把你当前看到的所有数据和空列表状态，强制覆盖掉代码里的初始预设
+  DB.skills = state.library.map(s=>[s.name, s.sexu, s.desc, s.kejin]);
+  DB.zuoyou = state.zuoyou.map(z=>[z.name, z.desc, z.kejin]);
+  DB.sets = {}; // 彻底干掉旧套装
+  DB.setOrder = ['测试']; // 只留测试
+  DB.savedAt = state.dbSavedAt;
+  
   writeLocalDb();
+  
   if(gitReady() && state.git.token){
     toast(`「${name}」已保存，正在提交仓库…`);
     pushRemoteDb(`更新技能色链：${name} ${new Date().toLocaleString('zh-CN')}`).then(r=>{
@@ -1280,7 +1277,7 @@ function openSkillList(isZ){
     body:`<div class="form"><input type="text" id="l_kw" placeholder="搜索技能名"></div>
       <div class="tip">共 ${list.length} 项，点击可修改</div>
       <div class="list" id="l_list"></div>`,
-    actions:[['返回','mute', openEditHub]]
+    actions:[['返回','mute', closeDialog]]
   });
   const box = document.getElementById('l_list');
   const kw = document.getElementById('l_kw');
@@ -1336,8 +1333,8 @@ function openSkillForm(target, isZ){
     title:(isEdit?'修改':'添加') + (isZ?'左幽皮肤技能':'技能色链'),
     body, raw:true,
     actions:[
-      ['暂不' + (isEdit?'修改':'添加'),'mute', ()=> isEdit ? openSkillList(isZ) : openEditHub()],
-      ...(isEdit ? [['删除该技能','danger', ()=> confirmDeleteSkill(target, isZ)]] : []),
+  ['暂不' + (isEdit?'修改':'添加'),'mute', closeDialog], // 修改为直接关闭弹窗
+  ...(isEdit ? [['删除该技能','danger', ()=> confirmDeleteSkill(target, isZ)]] : []),
       [(isEdit?'保存修改':'添加'),'', ()=>{
         const name = document.getElementById('f_name').value.trim();
         const kejin = document.getElementById('f_kejin').value.trim();
