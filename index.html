@@ -738,7 +738,7 @@ function commitChange(name){
 function openGitDialog(){
   const ready = gitReady();
   openDialog({
-    title:'', raw:true, actions:[],
+    title:'', raw:true, actions:[['关闭窗口','mute',closeDialog]],
     body:`<div class="gp" id="gp">
       <div class="ghead" id="gHead">
         <span class="gtitle">🐙 GitHub 仓库同步</span>
@@ -1315,7 +1315,8 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('#menuPanel') && !e.target.closest('#menuBtn')) toggleMenu(false);
 });
 
-document.getElementById('modal').addEventListener('click', e=>{ if(e.target.id === 'modal') closeDialog(); });
+/* 点弹窗以外的地方不再关闭弹窗，只能用弹窗内的按钮关闭 */
+document.getElementById('modal').addEventListener('click', e=>{ if(e.target.id === 'modal') e.stopPropagation(); });
 document.getElementById('clearBtn').addEventListener('click', clearAll);
 document.getElementById('setSelect').addEventListener('change', e=> loadSet(e.target.value));
 document.getElementById('doSearch').addEventListener('click', renderResults);
