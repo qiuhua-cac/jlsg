@@ -10,7 +10,7 @@
   --pink:#f4606c; --pink-d:#e34a57; --re:#ED1B24; --ye:#FEF200; --gr:#23B14D;
   --bl:#00A3E8; --pu:#8E0094; --line:#e6e6e6; --txt:#000; --sub:#8a8a8a;
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 html,body{height:100%;margin:0;background:#eeeeee;color:var(--txt);
   font-family:Roboto,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;}
 #app{max-width:620px;height:100%;margin:0 auto;background:#fff;display:flex;flex-direction:column;
@@ -169,6 +169,34 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
   font-family:inherit}
 .dirty{color:#e34a57;font-size:12px;font-weight:600}
 [contenteditable]{-webkit-user-select:text}
+/* 绝对领域：禁止选中和长按呼出菜单 */
+.dialog-body {
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    -khtml-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+}
+/* 使用伪元素阻挡所有长按交互 */
+.dialog-body::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 999;
+    display: block;
+}
+.dialog-body {
+    position: relative;
+}
+/* 仅允许输入框可以被操作 */
+.dialog-body input, .dialog-body textarea {
+    pointer-events: auto !important;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    z-index: 1000;
+    position: relative;
+}
 </style>
 </head>
 <body>
@@ -845,9 +873,26 @@ function openDialog({title, body, actions, raw}){
   if(title){ t.textContent = title; head.style.display = ''; }
   else { t.textContent = ''; head.style.display = 'none'; }
   const b = document.getElementById('dlgBody');
-  b.onclick = null;
-  if(raw){ b.innerHTML = body; b.classList.add('raw'); }
-  else { b.textContent = body; b.classList.remove('raw'); }
+b.onclick = null;
+// 暴力拦截所有可能与长按相关的事件
+b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); return false; };
+b.onselectstart = (e) => { e.preventDefault(); return false; };
+b.onselect = (e) => { e.preventDefault(); return false; };
+b.ondragstart = (e) => { e.preventDefault(); return false; };
+b.oncopy = (e) => { e.preventDefault(); return false; };
+
+if(raw){ 
+    b.innerHTML = body; 
+    b.classList.add('raw'); 
+} else { 
+    // 不使用 textContent，直接转化为段落元素，让系统无法直接选中
+    b.innerHTML = '';
+    const p = document.createElement('div');
+    p.style.whiteSpace = 'pre-wrap';
+    p.innerText = body;
+    b.appendChild(p);
+    b.classList.remove('raw'); 
+}
   const f = document.getElementById('dlgFoot');
   f.innerHTML = '';
   f.style.display = (actions && actions.length === 0) ? 'none' : '';
@@ -863,15 +908,51 @@ function openDialog({title, body, actions, raw}){
 function closeDialog(){ document.getElementById('modal').classList.remove('show'); }
 
 function attachLongPress(node, cb){
-  let timer = null, fired = false;
-  const start = ()=>{ fired = false; timer = setTimeout(()=>{ fired = true; cb(); }, 460); };
-  const clear = ()=>{ if(timer){ clearTimeout(timer); timer = null; } };
+  let timer = null, isLongPress = false;
+
+  const start = (e) => {
+    isLongPress = false;
+    // 阻止手机默认的长按菜单
+    if(e.type === 'touchstart') {
+        // 在有些浏览器，阻止默认行为会连点击一起干掉，需要小心处理
+    }
+    timer = setTimeout(() => {
+      isLongPress = true;
+      cb(); // 触发我们的弹窗
+    }, 460);
+  };
+
+  const cancel = () => {
+    if(timer) { clearTimeout(timer); timer = null; }
+  };
+
   node.addEventListener('pointerdown', start);
-  node.addEventListener('pointerup', clear);
-  node.addEventListener('pointercancel', clear);
-  node.addEventListener('pointerleave', clear);
-  node.addEventListener('contextmenu', e=>{ e.preventDefault(); if(timer) clear(); cb(); });
-  node.addEventListener('click', e=>{ if(fired){ e.preventDefault(); e.stopPropagation(); fired=false; } }, true);
+  node.addEventListener('pointerup', cancel);
+  node.addEventListener('pointerleave', cancel);
+  node.addEventListener('pointercancel', cancel);
+  
+  // 阻止原生右键（电脑端）
+  node.addEventListener('contextmenu', e => { 
+      e.preventDefault(); 
+      e.stopPropagation();
+      cancel(); 
+      cb(); 
+  });
+  
+  // 阻止因长按触发的系统菜单
+  node.addEventListener('touchstart', e => {
+      // 阻止双指缩放
+      if(e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+
+  // 点击时判断是否为长按后触发
+  node.addEventListener('click', e => {
+    if (isLongPress) {
+      e.preventDefault();
+      e.stopPropagation();
+      isLongPress = false;
+    }
+  }, true);
 }
 
 function showInfo(skill){
@@ -1341,6 +1422,11 @@ document.querySelector('.actcol').addEventListener('click', e=>{
 });
 
 /* ================= 启动 ================= */
+// 终极全局拦截：利用捕获阶段拦截所有长按和选中行为
+document.addEventListener('contextmenu', e => { e.preventDefault(); return false; }, true);
+document.addEventListener('selectstart', e => { e.preventDefault(); return false; }, true);
+document.addEventListener('copy', e => { e.preventDefault(); return false; }, true);
+
 const localDb = readLocalDb();
 dbToLib(localDb ? localDb : {skills: DB.skills, zuoyou: DB.zuoyou, savedAt: 0});
 loadStore();
