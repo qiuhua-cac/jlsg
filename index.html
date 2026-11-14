@@ -242,8 +242,9 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
 /* 仅针对移动端：转移至左上角防误触 */
 @media (max-width: 768px) {
     .skil {
-        padding-right: 0; 
-        padding-left: 14px; /* 左侧留出空间 */
+        /* 左右两端设置相同的 padding，让文字完全居中 */
+        padding-right: 14px; 
+        padding-left: 14px; 
     }
     .skill-info-btn {
         right: auto;
