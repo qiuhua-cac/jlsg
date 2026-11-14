@@ -178,10 +178,16 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
     -ms-user-select: none !important;
     user-select: none !important;
 }
-/* 允许输入框打字 */
+/* 允许输入框打字、长按全选与菜单操作 */
 .dialog-body input, .dialog-body textarea {
+    -webkit-touch-callout: auto !important;
     -webkit-user-select: text !important;
+    -khtml-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
     user-select: text !important;
+    touch-action: auto !important;
+    pointer-events: auto !important; /* 确保鼠标和触摸能穿透父级的 none */
 }
 
 /* 恢复所有按钮的正常点击反馈 */
@@ -939,12 +945,19 @@ function openDialog({title, body, actions, raw}){
   else { t.textContent = ''; head.style.display = 'none'; }
   const b = document.getElementById('dlgBody');
 b.onclick = null;
-// 暴力拦截所有可能与长按相关的事件
-b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); return false; };
-b.onselectstart = (e) => { e.preventDefault(); return false; };
-b.onselect = (e) => { e.preventDefault(); return false; };
-b.ondragstart = (e) => { e.preventDefault(); return false; };
-b.oncopy = (e) => { e.preventDefault(); return false; };
+// 拦截非输入框的文本选中和右键菜单，保留输入框的特权
+b.oncontextmenu = (e) => { 
+    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
+    e.preventDefault(); e.stopPropagation(); return false; 
+};
+b.onselectstart = (e) => { 
+    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
+    e.preventDefault(); return false; 
+};
+b.ondragstart = (e) => { 
+    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
+    e.preventDefault(); return false; 
+};
 
 if(raw){ 
     b.innerHTML = body; 
@@ -964,6 +977,15 @@ if(raw){
     b.appendChild(p);
     b.classList.remove('raw'); 
 }
+
+// 核心修复：恢复弹窗内所有 input 和 textarea 的原生交互能力（长按选中、全选、粘贴等）
+setTimeout(() => {
+    b.querySelectorAll('input, textarea').forEach(inputEl => {
+        inputEl.style.pointerEvents = 'auto';
+        inputEl.style.webkitUserSelect = 'text';
+        inputEl.style.userSelect = 'text';
+    });
+}, 0);
   const f = document.getElementById('dlgFoot');
   f.innerHTML = '';
   f.style.display = (actions && actions.length === 0) ? 'none' : '';
@@ -1474,8 +1496,14 @@ document.querySelector('.actcol').addEventListener('click', e=>{
 });
 
 /* ================= 启动 ================= */
-document.addEventListener('contextmenu', e => e.preventDefault());
-document.addEventListener('selectstart', e => e.preventDefault());
+document.addEventListener('contextmenu', e => {
+    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
+    e.preventDefault();
+});
+document.addEventListener('selectstart', e => {
+    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
+    e.preventDefault();
+});
 // 阻断微信/安卓浏览器底层的长按长按高亮与震动提示
 document.addEventListener('touchstart', function(e) {
     if (e.target.tagName === 'BUTTON' || e.target.classList.contains('skil') || e.target.classList.contains('skill-info-btn')) {
