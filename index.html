@@ -199,7 +199,7 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
 }
 </style>
 </head>
-<body oncontextmenu="return false;" ontouchstart="return true;">
+<body oncontextmenu="return false;" ontouchstart="return true;" style="-webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: pan-y;">
 <div id="app">
   <div class="appbar">
     <div class="title">极略三国合珠子辅助器</div>
@@ -925,46 +925,57 @@ function attachLongPress(node, cb){
   let isLongPress = false;
   let startX = 0, startY = 0;
 
+  // 强制屏蔽系统默认手势识别
   node.style.webkitTouchCallout = 'none';
   node.style.webkitUserSelect = 'none';
   node.style.userSelect = 'none';
+  node.style.touchAction = 'manipulation';
 
   node.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 1) return;
+    if (e.touches.length > 1) return; 
     isLongPress = false;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
 
-    // 350ms 触发，抢在系统 500ms 震动前弹出
+    // 【核心拦截】：直接拦截默认行为，阻止系统判定为长按/选中
+    if (e.cancelable) e.preventDefault();
+
     timer = setTimeout(() => {
       isLongPress = true;
-      // 强行打断震动
+      
+      // 物理级防震：瞬间改变透明度/重绘，让浏览器认为该元素被“重置”了，打断系统的震动判定
+      node.style.opacity = '0.99';
       if (navigator.vibrate) navigator.vibrate(0); 
       
+      // 强制清除选中状态
       if (window.getSelection) {
         if (window.getSelection().empty) window.getSelection().empty();
         else if (window.getSelection().removeAllRanges) window.getSelection().removeAllRanges();
       }
 
-      // 视觉欺骗
-      node.style.opacity = '0.99';
-      cb();
+      cb(); // 触发弹窗
+
       setTimeout(() => { node.style.opacity = '1'; }, 10);
-    }, 350);
-  }, { passive: true });
+      
+    }, 350); // 提前到 350ms，赶在系统 500ms 震动前
+  }, { passive: false }); // 必须是 false，否则无法 preventDefault
 
   node.addEventListener('touchmove', (e) => {
     if (timer && e.touches.length > 0) {
       const dx = Math.abs(e.touches[0].clientX - startX);
       const dy = Math.abs(e.touches[0].clientY - startY);
-      if (dx > 10 || dy > 10) { clearTimeout(timer); timer = null; }
+      if (dx > 10 || dy > 10) {
+        clearTimeout(timer);
+        timer = null;
+      }
     }
   }, { passive: true });
 
   node.addEventListener('touchend', (e) => {
     if (timer) { clearTimeout(timer); timer = null; }
     if (isLongPress) {
-      e.preventDefault(); e.stopPropagation();
+      e.preventDefault();
+      e.stopPropagation();
       isLongPress = false;
     }
   });
@@ -974,23 +985,38 @@ function attachLongPress(node, cb){
     isLongPress = false;
   });
 
+  // 电脑端鼠标长按不受影响
   node.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0) return; 
     isLongPress = false;
-    timer = setTimeout(() => { isLongPress = true; cb(); }, 350);
+    timer = setTimeout(() => {
+      isLongPress = true;
+      cb();
+    }, 350);
   });
 
-  node.addEventListener('mouseup', () => { if (timer) { clearTimeout(timer); timer = null; } });
-  node.addEventListener('mouseleave', () => { if (timer) { clearTimeout(timer); timer = null; } });
+  node.addEventListener('mouseup', () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+  });
+
+  node.addEventListener('mouseleave', () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+  });
 
   node.addEventListener('contextmenu', (e) => {
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation();
     if (timer) { clearTimeout(timer); timer = null; }
-    cb(); return false;
+    cb(); 
+    return false;
   });
 
   node.addEventListener('click', (e) => {
-    if (isLongPress) { e.preventDefault(); e.stopPropagation(); isLongPress = false; }
+    if (isLongPress) {
+      e.preventDefault();
+      e.stopPropagation();
+      isLongPress = false;
+    }
   }, true);
 }
 
