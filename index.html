@@ -152,6 +152,14 @@ select{width:100%;height:40px;border:none;border-bottom:1px solid #c9c9c9;backgr
   border:1px solid #dfe6ee;border-radius:6px;background:#fff;font-size:13px;font-family:inherit;color:#1b1b1b;outline:none}
 .gp input:focus{border-color:#8fb6e8;box-shadow:0 0 0 3px rgba(47,111,208,.12)}
 .gp input::placeholder{color:#a8b3bf}
+/* 开放 Git 面板输入框的文本选择、长按粘贴等原生权限 */
+.gp input {
+    -webkit-touch-callout: auto !important;
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    pointer-events: auto !important;
+    touch-action: auto !important;
+}
 .gfoot{display:flex;justify-content:flex-end;gap:8px;padding-top:2px;flex-wrap:wrap}
 .gbtn{border:1px solid #dfe6ee;background:#fff;color:#33414f;font-family:inherit;font-size:12.5px;
   padding:7px 12px;border-radius:6px;cursor:pointer}
@@ -178,8 +186,8 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
     -ms-user-select: none !important;
     user-select: none !important;
 }
-/* 允许输入框打字、长按全选与菜单操作 */
-.dialog-body input, .dialog-body textarea {
+/* 强制恢复所有输入框的原生长按/选中/粘贴权限 */
+input, textarea, .dialog-body input, .dialog-body textarea, .gp input {
     -webkit-touch-callout: auto !important;
     -webkit-user-select: text !important;
     -khtml-user-select: text !important;
@@ -187,7 +195,7 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
     -ms-user-select: text !important;
     user-select: text !important;
     touch-action: auto !important;
-    pointer-events: auto !important; /* 确保鼠标和触摸能穿透父级的 none */
+    pointer-events: auto !important;
 }
 
 /* 恢复所有按钮的正常点击反馈 */
@@ -264,7 +272,7 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
 }
 </style>
 </head>
-<body oncontextmenu="return false;" ontouchstart="return true;" style="-webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: pan-y;">
+<body style="touch-action: pan-y;">
 <div id="app">
   <div class="appbar">
     <div class="title">极略三国合珠子辅助器</div>
@@ -955,6 +963,7 @@ function openDialog({title, body, actions, raw}){
 b.onclick = null;
 // 拦截非输入框的文本选中和右键菜单，保留输入框的特权
 b.oncontextmenu = (e) => { 
+    // 技能说明等输入框，以及 Git 同步设置的输入框都放行
     if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
     e.preventDefault(); e.stopPropagation(); return false; 
 };
@@ -986,14 +995,23 @@ if(raw){
     b.classList.remove('raw'); 
 }
 
-// 核心修复：恢复弹窗内所有 input 和 textarea 的原生交互能力（长按选中、全选、粘贴等）
+// 核心修复：暴力解除所有限制，强制让系统原生识别输入框
 setTimeout(() => {
     b.querySelectorAll('input, textarea').forEach(inputEl => {
+        // 1. 打通物理接触
         inputEl.style.pointerEvents = 'auto';
-        inputEl.style.webkitUserSelect = 'text';
-        inputEl.style.userSelect = 'text';
+        inputEl.style.touchAction = 'auto';
+        
+        // 2. 强制赋予可选中、可长按属性
+        inputEl.style.setProperty('-webkit-user-select', 'text', 'important');
+        inputEl.style.setProperty('user-select', 'text', 'important');
+        inputEl.style.setProperty('-webkit-touch-callout', 'default', 'important');
+        
+        // 3. 关键：让手机系统认定它是可编辑区域，才能呼出复制粘贴
+        inputEl.setAttribute('contenteditable', 'true');
+        inputEl.style.setProperty('-webkit-user-modify', 'read-write-plaintext-only', 'important');
     });
-}, 0);
+}, 50);
   const f = document.getElementById('dlgFoot');
   f.innerHTML = '';
   f.style.display = (actions && actions.length === 0) ? 'none' : '';
@@ -1505,18 +1523,19 @@ document.querySelector('.actcol').addEventListener('click', e=>{
 
 /* ================= 启动 ================= */
 document.addEventListener('contextmenu', e => {
-    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
+    // 只要是在输入框内触发，绝对不拦截，完全交给手机系统
+    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return true;
     e.preventDefault();
 });
 document.addEventListener('selectstart', e => {
-    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
+    if(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return true;
     e.preventDefault();
 });
-// 阻断微信/安卓浏览器底层的长按长按高亮与震动提示
+// 针对按钮区域，彻底干掉系统的原生长按菜单行为
 document.addEventListener('touchstart', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return true;
     if (e.target.tagName === 'BUTTON' || e.target.classList.contains('skil') || e.target.classList.contains('skill-info-btn')) {
-        // 针对按钮区域，彻底干掉系统的原生长按菜单行为
-        // 注意：这里不 preventDefault 整个 document，以免影响正常打字和滚动
+        // 拦截按钮长按，防止震动
     }
 }, {passive: true});
 
