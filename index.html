@@ -200,34 +200,39 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
 /* 新增：技能卡片内部的布局与详情图标 */
 .skil {
     position: relative;
-    padding-right: 20px; /* 给右上角图标留出空间 */
+    padding-right: 14px; /* 只需给极小图标留出微微的空间 */
 }
 .skill-info-btn {
     position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 20px;
-    height: 20px;
-    background-color: rgba(255,255,255,0.45);
-    border: 1px solid rgba(0,0,0,0.05);
+    top: 2px;
+    right: 2px;
+    width: 14px; /* 缩小到 14px */
+    height: 14px; /* 缩小到 14px */
+    background-color: transparent; /* 去掉底色，去除杂乱感 */
+    border: 1px solid rgba(0, 0, 0, 0.15); /* 极淡的细边框 */
     border-radius: 50%;
-    font-size: 13px;
-    color: #555;
+    color: transparent; /* 隐藏原有的 i 字母 */
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: "Georgia", serif; /* 改用斜体衬线字体，更像信息图标 */
-    font-style: italic;
-    font-weight: bold;
-    line-height: 1;
     cursor: pointer;
     z-index: 5;
-    transition: background-color 0.15s, transform 0.1s;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    transition: all 0.2s;
 }
+/* 用伪元素画一个更精致的小点或者更小的 i */
+.skill-info-btn::after {
+    content: 'i';
+    font-size: 9px;
+    font-family: "Georgia", serif;
+    font-style: italic;
+    font-weight: bold;
+    color: rgba(0, 0, 0, 0.45); /* 使用柔和的浅灰色，不刺眼 */
+    line-height: 1;
+}
+/* 点击时稍微亮起一点点即可 */
 .skill-info-btn:active {
-    background-color: rgba(255,255,255,0.9);
-    transform: scale(0.92);
+    background-color: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.3);
 }
 </style>
 </head>
