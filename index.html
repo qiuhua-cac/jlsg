@@ -200,18 +200,18 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
 /* 新增：技能卡片内部的布局与详情图标 */
 .skil {
     position: relative;
-    padding-right: 14px; /* 只需给极小图标留出微微的空间 */
+    padding-right: 14px; /* 电脑端给右侧留空间 */
 }
 .skill-info-btn {
     position: absolute;
     top: 2px;
     right: 2px;
-    width: 14px; /* 缩小到 14px */
-    height: 14px; /* 缩小到 14px */
-    background-color: transparent; /* 去掉底色，去除杂乱感 */
-    border: 1px solid rgba(0, 0, 0, 0.15); /* 极淡的细边框 */
+    width: 14px;
+    height: 14px;
+    background-color: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.15);
     border-radius: 50%;
-    color: transparent; /* 隐藏原有的 i 字母 */
+    color: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -219,20 +219,41 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
     z-index: 5;
     transition: all 0.2s;
 }
-/* 用伪元素画一个更精致的小点或者更小的 i */
 .skill-info-btn::after {
     content: 'i';
     font-size: 9px;
     font-family: "Georgia", serif;
     font-style: italic;
     font-weight: bold;
-    color: rgba(0, 0, 0, 0.45); /* 使用柔和的浅灰色，不刺眼 */
+    color: rgba(0, 0, 0, 0.45);
     line-height: 1;
 }
-/* 点击时稍微亮起一点点即可 */
 .skill-info-btn:active {
     background-color: rgba(0, 0, 0, 0.05);
     border-color: rgba(0, 0, 0, 0.3);
+}
+
+/* 仅针对移动端：转移至左上角防误触 */
+@media (max-width: 768px) {
+    .skil {
+        padding-right: 0; 
+        padding-left: 14px; /* 左侧留出空间 */
+    }
+    .skill-info-btn {
+        right: auto;
+        left: 3px; /* 移动到左上角 */
+        width: 12px; /* 移动端进一步缩小，减少干扰 */
+        height: 12px;
+        background-color: rgba(0, 0, 0, 0.05); /* 移动端加个极淡的底色，更像标签 */
+        border: none; /* 去掉边框，更清爽 */
+    }
+    .skill-info-btn::after {
+        font-size: 8px; /* 移动端字体更小 */
+        color: rgba(0, 0, 0, 0.4);
+    }
+    .skill-info-btn:active {
+        background-color: rgba(0, 0, 0, 0.15);
+    }
 }
 </style>
 </head>
