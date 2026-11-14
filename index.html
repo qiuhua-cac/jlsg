@@ -184,11 +184,10 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
     user-select: text !important;
 }
 
-/* 关键：恢复所有按钮的正常点击反馈 */
+/* 恢复所有按钮的正常点击反馈 */
 .skil, .btn, .tbtn, .pitem, .hubitem {
     touch-action: manipulation; 
     cursor: pointer;
-    /* 终极防长按震动/选中 */
     -webkit-touch-callout: none !important;
     -webkit-user-select: none !important;
     -khtml-user-select: none !important;
@@ -196,6 +195,39 @@ pre.out{background:#fafafa;border:1px solid #eee;border-radius:6px;padding:10px;
     -ms-user-select: none !important;
     user-select: none !important;
     -webkit-tap-highlight-color: transparent !important;
+}
+
+/* 新增：技能卡片内部的布局与详情图标 */
+.skil {
+    position: relative;
+    padding-right: 20px; /* 给右上角图标留出空间 */
+}
+.skill-info-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    background-color: rgba(255,255,255,0.45);
+    border: 1px solid rgba(0,0,0,0.05);
+    border-radius: 50%;
+    font-size: 13px;
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "Georgia", serif; /* 改用斜体衬线字体，更像信息图标 */
+    font-style: italic;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 5;
+    transition: background-color 0.15s, transform 0.1s;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.skill-info-btn:active {
+    background-color: rgba(255,255,255,0.9);
+    transform: scale(0.92);
 }
 </style>
 </head>
@@ -920,111 +952,25 @@ if(raw){
 }
 function closeDialog(){ document.getElementById('modal').classList.remove('show'); }
 
+// 彻底废弃长按，根除系统震动
 function attachLongPress(node, cb){
-  let timer = null;
-  let isLongPress = false;
-  let startX = 0, startY = 0;
-
-  // 强制屏蔽系统默认手势识别
-  node.style.webkitTouchCallout = 'none';
-  node.style.webkitUserSelect = 'none';
-  node.style.userSelect = 'none';
-  node.style.touchAction = 'manipulation';
-
-  node.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 1) return; 
-    isLongPress = false;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-
-    // 【核心拦截】：直接拦截默认行为，阻止系统判定为长按/选中
-    if (e.cancelable) e.preventDefault();
-
-    timer = setTimeout(() => {
-      isLongPress = true;
-      
-      // 物理级防震：瞬间改变透明度/重绘，让浏览器认为该元素被“重置”了，打断系统的震动判定
-      node.style.opacity = '0.99';
-      if (navigator.vibrate) navigator.vibrate(0); 
-      
-      // 强制清除选中状态
-      if (window.getSelection) {
-        if (window.getSelection().empty) window.getSelection().empty();
-        else if (window.getSelection().removeAllRanges) window.getSelection().removeAllRanges();
-      }
-
-      cb(); // 触发弹窗
-
-      setTimeout(() => { node.style.opacity = '1'; }, 10);
-      
-    }, 350); // 提前到 350ms，赶在系统 500ms 震动前
-  }, { passive: false }); // 必须是 false，否则无法 preventDefault
-
-  node.addEventListener('touchmove', (e) => {
-    if (timer && e.touches.length > 0) {
-      const dx = Math.abs(e.touches[0].clientX - startX);
-      const dy = Math.abs(e.touches[0].clientY - startY);
-      if (dx > 10 || dy > 10) {
-        clearTimeout(timer);
-        timer = null;
-      }
-    }
-  }, { passive: true });
-
-  node.addEventListener('touchend', (e) => {
-    if (timer) { clearTimeout(timer); timer = null; }
-    if (isLongPress) {
-      e.preventDefault();
-      e.stopPropagation();
-      isLongPress = false;
-    }
-  });
-
-  node.addEventListener('touchcancel', () => {
-    if (timer) { clearTimeout(timer); timer = null; }
-    isLongPress = false;
-  });
-
-  // 电脑端鼠标长按不受影响
-  node.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return; 
-    isLongPress = false;
-    timer = setTimeout(() => {
-      isLongPress = true;
-      cb();
-    }, 350);
-  });
-
-  node.addEventListener('mouseup', () => {
-    if (timer) { clearTimeout(timer); timer = null; }
-  });
-
-  node.addEventListener('mouseleave', () => {
-    if (timer) { clearTimeout(timer); timer = null; }
-  });
-
-  node.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (timer) { clearTimeout(timer); timer = null; }
-    cb(); 
-    return false;
-  });
-
-  node.addEventListener('click', (e) => {
-    if (isLongPress) {
-      e.preventDefault();
-      e.stopPropagation();
-      isLongPress = false;
-    }
-  }, true);
+  // 留空即可，不再绑定任何 touch 长按事件
 }
 
 function showInfo(skill){
-  const lines = [];
-  if(skill.sexu) lines.push('色需:' + sexuText(skill.sexu));
-  lines.push(skill.desc || '');
-  openDialog({title: skill.name, body: lines.join('\n'), actions:[['关闭','mute',closeDialog]]});
+  let bodyHtml = '';
+  if(skill.sexu) {
+    // 简单美化一下色需的排版
+    bodyHtml += `<div style="color:#888; font-size:13px; margin-bottom:8px;">色需：${sexuText(skill.sexu)}</div>`;
+  }
+  bodyHtml += `<div style="font-size:14px; line-height:1.7; color:#333;">${esc(skill.desc || '暂无描述')}</div>`;
+  
+  openDialog({
+    title: skill.name, 
+    raw: true,
+    body: bodyHtml, 
+    actions:[['关闭','mute',closeDialog]]
+  });
 }
 
 /* ================= 渲染 ================= */
@@ -1062,13 +1008,21 @@ function renderGrid(){
 }
 
 function skillButton(skill, disabled, onClick){
+  // 创建主按钮
   const b = el('button','skil' + (disabled?' disabled':'') + (skill.kejin==='1'?' kejin':''), skill.name);
   
-  // 点击直接触发原有的添加/移除逻辑
+  // 点击主区域，执行添加逻辑
   if(!disabled) b.addEventListener('click', onClick);
   
-  // 恢复长按查看详情
-  attachLongPress(b, () => showInfo(skill));
+  // 创建右上角的详情图标 (点击即可查看，无需长按，避免手机震动)
+  const infoBtn = el('div', 'skill-info-btn', 'i');
+  infoBtn.addEventListener('click', (e) => {
+    e.preventDefault(); // 彻底阻断系统原生事件
+    e.stopPropagation(); // 阻止冒泡，防止触发主按钮的添加事件
+    showInfo(skill);
+  });
+
+  b.appendChild(infoBtn);
   
   return b;
 }
@@ -1496,6 +1450,13 @@ document.querySelector('.actcol').addEventListener('click', e=>{
 /* ================= 启动 ================= */
 document.addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('selectstart', e => e.preventDefault());
+// 阻断微信/安卓浏览器底层的长按长按高亮与震动提示
+document.addEventListener('touchstart', function(e) {
+    if (e.target.tagName === 'BUTTON' || e.target.classList.contains('skil') || e.target.classList.contains('skill-info-btn')) {
+        // 针对按钮区域，彻底干掉系统的原生长按菜单行为
+        // 注意：这里不 preventDefault 整个 document，以免影响正常打字和滚动
+    }
+}, {passive: true});
 
 const localDb = readLocalDb();
 dbToLib(localDb ? localDb : {skills: DB.skills, zuoyou: DB.zuoyou, savedAt: 0});
